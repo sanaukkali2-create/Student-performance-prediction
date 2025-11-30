@@ -1,0 +1,224 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Performance Predictor</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    .container {
+      background-color: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h2 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .input-group {
+      margin-bottom: 15px;
+    }
+    label {
+      display: block;
+      margin-bottom: 5px;
+      color: #555;
+      font-weight: 500;
+    }
+    input {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #ddd;
+      border-radius: 5px;
+      font-size: 16px;
+      transition: border-color 0.3s;
+    }
+    input:focus {
+      outline: none;
+      border-color: #4CAF50;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-size: 18px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 20px;
+      transition: background-color 0.3s;
+    }
+    button:hover:not(:disabled) {
+      background-color: #45a049;
+    }
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
+    }
+    #result {
+      text-align: center;
+      font-size: 32px;
+      font-weight: bold;
+      margin-top: 25px;
+      padding: 25px;
+      border-radius: 5px;
+      min-height: 80px;
+      animation: fadeIn 0.5s;
+    }
+    #result:empty {
+      display: none;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .pass {
+      background-color: #d4edda;
+      color: #155724;
+      border: 2px solid #c3e6cb;
+    }
+    .fail {
+      background-color: #f8d7da;
+      color: #721c24;
+      border: 2px solid #f5c6cb;
+    }
+    .error {
+      background-color: #fff3cd;
+      color: #856404;
+      border: 2px solid #ffeaa7;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>🎓 Student Pass/Fail Predictor</h2>
+    
+    <div class="input-group">
+      <label for="h">Hours Studied (per week)</label>
+      <input type="number" id="h" min="0" max="20" step="0.5" required>
+    </div>
+    
+    <div class="input-group">
+      <label for="a">Attendance (%)</label>
+      <input type="number" id="a" min="0" max="100" step="1" required>
+    </div>
+    
+    <div class="input-group">
+      <label for="p">Previous Score</label>
+      <input type="number" id="p" min="0" max="100" step="1" required>
+    </div>
+    
+    <button type="button" id="predictBtn">Predict</button>
+    
+    <div id="result"></div>
+  </div>
+
+<script>
+(function() {
+  'use strict';
+  
+  const predictBtn = document.getElementById('predictBtn');
+  const resultDiv = document.getElementById('result');
+  
+  function showResult(message, className) {
+    resultDiv.textContent = message;
+    resultDiv.className = className;
+  }
+  
+  async function predict() {
+    // Get input values
+    const hours = parseFloat(document.getElementById('h').value);
+    const attendance = parseFloat(document.getElementById('a').value);
+    const previous_score = parseFloat(document.getElementById('p').value);
+    
+    // Validate inputs
+    if (isNaN(hours) || isNaN(attendance) || isNaN(previous_score)) {
+      showResult('⚠️ Please fill in all fields', 'error');
+      return;
+    }
+    
+    if (hours < 0 || attendance < 0 || attendance > 100 || previous_score < 0 || previous_score > 100) {
+      showResult('⚠️ Please enter valid values', 'error');
+      return;
+    }
+    
+    // Disable button and show loading
+    predictBtn.disabled = true;
+    predictBtn.textContent = 'Predicting...';
+    resultDiv.textContent = '';
+    resultDiv.className = '';
+    
+    try {
+      const response = await fetch('http://localhost:5002/predict', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          hours: hours,
+          attendance: attendance,
+          previous_score: previous_score
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Server returned ' + response.status);
+      }
+
+      const data = await response.json();
+      
+      // Show result - THIS STAYS PERMANENTLY
+      if (data.pass === 1) {
+        showResult('PASS 🎉', 'pass');
+      } else if (data.pass === 0) {
+        showResult('FAIL ❌', 'fail');
+      } else {
+        throw new Error('Invalid response from server');
+      }
+      
+    } catch (error) {
+      console.error('Prediction error:', error);
+      showResult('❌ Error: ' + error.message, 'error');
+    } finally {
+      // Re-enable button
+      predictBtn.disabled = false;
+      predictBtn.textContent = 'Predict';
+    }
+  }
+  
+  // Button click handler
+  predictBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    predict();
+  });
+  
+  // Enter key handler
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      predict();
+    }
+  });
+  
+  console.log('Student Performance Predictor loaded and ready');
+})();
+</script>
+</body>
+</html>
